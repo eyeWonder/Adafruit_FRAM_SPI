@@ -1,9 +1,9 @@
 #include <SPI.h>
 #include "Adafruit_FRAM_SPI.h"
 
-/* Example code to interrogate Adafruit SPI FRAM breakout for address size and storage capacity */
+/* Example code to interrogate Adafruit SPI FRAM breakout storage capacity */
 
-/* NOTE: This sketch will overwrite data already on the FRAM breakout */
+/* NOTE: This sketch will not overwrite data already on the FRAM breakout */
 
 uint8_t FRAM_CS = 10;
 Adafruit_FRAM_SPI fram = Adafruit_FRAM_SPI();  // use hardware SPI
@@ -14,7 +14,6 @@ uint8_t FRAM_MOSI = 11;
 //Or use software SPI, any pins!
 //Adafruit_FRAM_SPI fram = Adafruit_FRAM_SPI(FRAM_SCK, FRAM_MISO, FRAM_MOSI, FRAM_CS);
 
-uint8_t           addrSizeInBytes = 2; //Default to address size of two bytes
 uint32_t          memSize;
 
 #if defined(ARDUINO_ARCH_SAMD)
@@ -41,14 +40,6 @@ int32_t readBack(uint32_t addr, int32_t data) {
   return check;
 }
 
-bool testAddrSize(uint8_t addrSize) {
-  fram.setAddressSize(addrSize);
-  if (readBack(4, 0xbeefbead) == 0xbeefbead)
-    return true;
-  return false;
-}
-
-
 void setup(void) {
   #ifndef ESP8266
     while (!Serial);     // will pause Zero, Leonardo, etc until serial console opens
@@ -56,33 +47,19 @@ void setup(void) {
 
   Serial.begin(9600);
   
-  if (fram.begin(FRAM_CS, addrSizeInBytes)) {
+  if (fram.begin(FRAM_CS)) {
     Serial.println("Found SPI FRAM");
   } else {
     Serial.println("No SPI FRAM found ... check your connections\r\n");
     while (1);
   }
 
-  if (testAddrSize(2))
-    addrSizeInBytes = 2;
-  else if (testAddrSize(3))
-    addrSizeInBytes = 3;
-  else if (testAddrSize(4))
-    addrSizeInBytes = 4;
-  else {
-    Serial.println("SPI FRAM can not be read/written with any address size\r\n");
-    while (1);
-  }
-  
   memSize = 0;
   while (readBack(memSize, memSize) == memSize) {
     memSize += 256;
     //Serial.print("Block: #"); Serial.println(memSize/256);
   }
   
-  Serial.print("SPI FRAM address size is ");
-  Serial.print(addrSizeInBytes);
-  Serial.println(" bytes.");
   Serial.println("SPI FRAM capacity appears to be..");
   Serial.print(memSize); Serial.println(" bytes");
   Serial.print(memSize/0x400); Serial.println(" kilobytes");

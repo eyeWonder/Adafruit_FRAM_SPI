@@ -60,15 +60,10 @@ Adafruit_FRAM_SPI::Adafruit_FRAM_SPI(int8_t clk, int8_t miso, int8_t mosi, int8_
 /**************************************************************************/
 boolean Adafruit_FRAM_SPI::begin()
 {
-	return begin(_cs, 2);
+	return begin(_cs);
 }
 
-boolean Adafruit_FRAM_SPI::begin(uint8_t nAddressSizeBytes)
-{
-	return begin(_cs, nAddressSizeBytes);
-}
-
-boolean Adafruit_FRAM_SPI::begin(int8_t cs, uint8_t nAddressSizeBytes)
+boolean Adafruit_FRAM_SPI::begin(int8_t cs)
 {
   if (cs == -1)
   {
@@ -77,7 +72,6 @@ boolean Adafruit_FRAM_SPI::begin(int8_t cs, uint8_t nAddressSizeBytes)
   }
 
   _cs = cs;
-  setAddressSize(nAddressSizeBytes);
 
   /* Configure SPI */
   pinMode(_cs, OUTPUT);
@@ -120,6 +114,11 @@ boolean Adafruit_FRAM_SPI::begin(int8_t cs, uint8_t nAddressSizeBytes)
     return false;
   }
 
+  if (discoverAddressWidth()==false)
+  {
+    Serial.println("Could not find the FRAM address width!");
+    return false;
+  }
   /* Everything seems to be properly initialised and connected */
   _framInitialised = true;
 
@@ -296,11 +295,6 @@ void Adafruit_FRAM_SPI::setStatusRegister(uint8_t value)
   digitalWrite(_cs, HIGH);
 }
 
-void Adafruit_FRAM_SPI::setAddressSize(uint8_t nAddressSize)
-{
-  _nAddressSizeBytes = nAddressSize;
-}
-
 uint8_t Adafruit_FRAM_SPI::SPItransfer(uint8_t x) {
   if (_clk == -1) {
     return SPI.transfer(x);
@@ -321,10 +315,53 @@ uint8_t Adafruit_FRAM_SPI::SPItransfer(uint8_t x) {
 
 void Adafruit_FRAM_SPI::writeAddress(uint32_t addr)
 {
-  if (_nAddressSizeBytes>3)
+  if (_nAddressWidth>3)
   	SPItransfer((uint8_t)(addr >> 24));
-  if (_nAddressSizeBytes>2)
+  if (_nAddressWidth>2)
   	SPItransfer((uint8_t)(addr >> 16));
   SPItransfer((uint8_t)(addr >> 8));
   SPItransfer((uint8_t)(addr & 0xFF));
+}
+
+int16_t Adafruit_FRAM_SPI::readBack16(uint32_t addr, int16_t data)
+{
+  int16_t backup;
+  // Backup the data at this address
+  read(addr, (uint8_t*)&backup, sizeof(backup));
+  // Write our test value
+  writeEnable(true);
+  write(addr, (uint8_t*)&data, sizeof(data));
+  writeEnable(false);
+  // Change out test value
+  data = !data;
+  // Read back from this address
+  read(addr, (uint8_t*)&data, sizeof(data));
+  // Restore original data
+  writeEnable(true);
+  write(addr, (uint8_t*)&backup, sizeof(backup));
+  writeEnable(false);
+  return data;
+}
+
+/*
+   In the FRAM chip datasheets there does not appear to be any method of finding out
+   the number of bytes needed for the address, other than trial and error.
+
+   This attemps to write and read back two bytes with increasing address width until
+   it finds the correct value. The existing data is saved and restored so no damage 
+   will be done to existing data. Using address 0 any bytes backed up are correctly
+   restored to the same location.
+*/
+bool Adafruit_FRAM_SPI::discoverAddressWidth()
+{
+  _nAddressWidth = 2;
+  if (readBack16(0, 0xabcd) == 0xabcd)
+    return true;
+  _nAddressWidth = 3;
+  if (readBack16(0, 0xabcd) == 0xabcd)
+    return true;
+  _nAddressWidth = 4;
+  if (readBack16(0, 0xabcd) == 0xabcd)
+    return true;
+  return false;
 }

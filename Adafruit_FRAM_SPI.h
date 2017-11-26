@@ -62,8 +62,7 @@ class Adafruit_FRAM_SPI {
   Adafruit_FRAM_SPI(int8_t clk, int8_t miso, int8_t mosi, int8_t cs);
 
   boolean  begin  ();
-  boolean  begin  (uint8_t nAddressSizeBytes);
-  boolean  begin  (int8_t cs, uint8_t nAddressSizeBytes);
+  boolean  begin  (int8_t cs);
   void     writeEnable (bool enable);
   void     write8 (uint32_t addr, uint8_t value);
   void     write (uint32_t addr, const uint8_t *values, size_t count);
@@ -72,14 +71,15 @@ class Adafruit_FRAM_SPI {
   void     getDeviceID(uint8_t *manufacturerID, uint16_t *productID);
   uint8_t  getStatusRegister(void);
   void     setStatusRegister(uint8_t value);
-  void     setAddressSize(uint8_t nAddressSize);
 
  private:
   uint8_t  SPItransfer(uint8_t x);
   void     writeAddress(uint32_t addr);
+  int16_t  readBack16(uint32_t addr, int16_t data);
+  bool     discoverAddressWidth();
 
   boolean _framInitialised;
-  uint8_t  _nAddressSizeBytes;
+  uint8_t  _nAddressWidth;
   int8_t _cs, _clk, _mosi, _miso;
 };
 
